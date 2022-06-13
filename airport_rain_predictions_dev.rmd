@@ -1,0 +1,166 @@
+
+```{r}
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+```
+
+```{r}
+rain <- fread("airport_data/IDCJAC0009_009021_1800_Data.csv")
+rain <- rain %>% drop_na("Rainfall amount (millimetres)")
+```
+
+```{r}
+min_year = rain$Year %>% min
+max_year = rain$Year %>% max
+rainfall_totals <- rain %>% 
+	group_by(Year, Month) %>% 
+	summarise(total_rainfall = sum(`Rainfall amount (millimetres)`))
+
+rainfall_totals %>% 
+	filter(Year != 1944, Year != 2022) %>% 
+	ggplot(aes(Year, total_rainfall)) + 
+	facet_grid(cols=vars(Month)) +
+	geom_point(alpha = 0.5) +
+	geom_smooth(method="lm", colour = "red") +
+	theme_classic() +
+	theme(axis.text.x=element_text(angle=60,hjust=1)) +
+	scale_x_continuous(breaks = c(min_year+1, max_year-1)) +
+	ggtitle("Perth rainfall monthly totals for each month between 1945 and 2021")
+ggsave("monthly_totals_regressed_year_as_predictor.png")
+```
+
+To get stats for these 12 regressions means 
+
+Do some basic sensitivity tests:
+
+```{r}
+test_july = rainfall_totals %>% filter(Month == 7)
+july_rainfall_vs_year <- lm(total_rainfall ~ Year, data = test_july)
+july_rainfall_vs_year %>% summary()
+plot(july_rainfall_vs_year)
+```
+
+```{r}
+test_dec = rainfall_totals %>% filter(Month == 12)
+dec_rainfall_vs_year <- lm(total_rainfall ~ Year, data = test_dec)
+dec_rainfall_vs_year %>% summary()
+plot(dec_rainfall_vs_year)
+predict(dec_rainfall_vs_year, list(Year = 2021), interval = "confidence")
+```
+
+```{r}
+summary(dec_rainfall_vs_year)$coefficients[2,]
+```
+
+
+## test all months individually
+
+I can make this set the intercept to the avg in 1945 by substracting 1945 from each year before doing the regression.
+
+```{r}
+models.year_vs_rainfall_per_month <- rainfall_totals %>% 
+	mutate(Year = Year - 1945) %>% 
+	group_by(Month) %>% 
+	group_modify(~ broom::tidy(lm(total_rainfall ~ Year, data = .)))
+models.year_vs_rainfall_per_month
+```
+
+### plot of beta estimates per month!
+
+```{r}
+models.year_vs_rainfall_per_month %>% 
+	filter(term == "Year") %>% 
+	ggplot(aes(Month, estimate, ymin=estimate-std.error, ymax=estimate+std.error, colour = -log10(p.value))) + 
+	theme_classic() +
+	geom_point() +
+	geom_pointrange() +
+	ggtitle("Estimated change in average total monthly rainfall per year") +
+	ylab("estimated change rainfall (mm)") +
+	scale_x_continuous(breaks = 1:12)
+ggsave("Estimated_change_in_average_total_monthly_rainfall_per_year.png")
+```
+
+
+
+### Plot of 1945 estimate of rainfall and 2021 estimate of rainfall totals?
+
+- 1945 is just intercept value.
+- 2021 will be 1945_total + (2021-1945)*beta_month
+
+```{r}
+models.year_vs_rainfall_per_month %>% 
+	filter(term == "(Intercept)") %>% 
+	ggplot(aes(Month, estimate, ymin=estimate-std.error, ymax=estimate+std.error, colour = -log10(p.value))) + 
+	geom_point() +
+	geom_pointrange() +
+	ggtitle("Estimate for mean rainfall at Perth Airport in 1945 (intercept estimates)") +
+	theme_classic()
+```
+
+2021 estimates?
+- 2021 will be 1945_total + (2021-1945)*beta_month
+
+```{r}
+models.year_vs_rainfall_per_month %>% 
+	pivot_wider(names_from = c(term), values_from = c("estimate","std.error","statistic","p.value")) %>% 
+	mutate(estimate_2021 = `estimate_(Intercept)` + 76*`estimate_Year`) %>% 
+	ggplot(aes(Month, estimate_2021, colour = -log10(p.value_Year))) + 
+	geom_point() +
+	ggtitle("Estimate for mean rainfall at Perth Airport in 2021") +
+	theme_classic()
+```
+
+Maybe easier to use `predict()` on model object to get 2021 estimates and std.err. I have re-done the regression without subtracting year as it is simpler to put in `predict(year = 2021)` than as `predict(year = 2021-1945)`.
+
+```{r}
+Years <- c(1945,1970,2021)
+models.year_vs_rainfall_per_month.predictions.CI <- rainfall_totals %>% 
+	group_by(Month) %>% 
+	group_modify(
+		~ as.data.frame(predict(
+				lm(total_rainfall ~ Year, data = .), list(Year = Years), interval = "confidence"
+			))) %>% 
+	mutate(Year = Years)
+
+models.year_vs_rainfall_per_month.predictions.CI %>% 
+	ggplot(aes(Month, fit, colour = Year, group = Year)) + 
+	geom_point() + geom_line() +
+	theme_classic() +
+	ggtitle("Monthly average total rainfall estimate predicted from per month model\nfor 1945, 1970, and 2021 (Perth Airport)") +
+	ylab("Estimated rainfall total (mm)") +
+	scale_x_continuous(breaks = 1:12)
+ggsave("monthly_total_rain_est_predicted_from_per_month_models.png")
+```
+
+
+
+
+# Test month as predictor of rainfall total
+
+Oh cool year is significant here!
+All/most months are significant too. Note January is baseline here. Hence all estimates are positive. Significance of other months depends on which month is used as the default month here. Since summer months are similar to each other it is unsurprising that they have small relative differences to each other.
+```{r}
+#need Month as factor for this to work
+rainfall_totals_cat_month <- rainfall_totals %>% 
+	mutate(Month = as.factor(Month)) %>% 
+	mutate(Month = fct_relevel(Month, as.character(1:12)))
+month_predict_rainfall <- lm(total_rainfall ~ Month + Year, data = rainfall_totals_cat_month)
+summary(month_predict_rainfall)
+```
+
+LOL this looks awful! 🤣 I guess Month as a categorical variable is problematic here.
+
+```{r}
+plot(month_predict_rainfall)
+```
+
+Try month as a numeric value? Well this returns a similar value for Year at least. Diagnostic plots still show assumptions *very* violated.
+
+```{r}
+month_predict_rainfall_monthnumeric <- lm(total_rainfall ~ Month + Year, data = rainfall_totals)
+summary(month_predict_rainfall_monthnumeric)
+plot(month_predict_rainfall_monthnumeric)
+```
+
+
+
