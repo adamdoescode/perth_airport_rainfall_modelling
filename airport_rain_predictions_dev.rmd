@@ -319,6 +319,11 @@ Combine month and day as a single axis? Yes, can do this as a simple index.
 Can then add days and month as x axis?
 
 ```{r}
+rainy_days
+```
+
+
+```{r}
 rainy_days$index <- 1:length(rainy_days$Day)
 rainy_days <- rainy_days %>% mutate(date_str = str_c(Day, Month, sep = "/"))
 #custom_breaks = seq(1,366,31)

@@ -1,0 +1,106 @@
+
+# Rainfall analysis and prediction for Perth Airport
+
+Having recently moved to Perth from Newcaslte I am intrigued by the different weather patterns here in Perth. The most striking feature is that rainfall in Perth is *seasonal* while in Newcastle it is mostly constant year round.
+
+So I wanted to explore the nature of rainfall in Perth. Fortunately, it is easy to get data for any Australian weather site from the [Bureau of Meterology website](http://www.bom.gov.au/climate/data/?ref=ftr).
+
+The data I am using in this notebook is the daily rainfall totals for Perth Airport weather station. It has been continuously monitoring rainfall since May 1944! This allows us to get a good grasp on the seasonal rainfall patterns in Perth and also what the year to year trend looks like.
+
+## code setup
+
+Libraries:
+
+```{r}
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+suppressMessages(library(splines))
+```
+
+## import and clean data
+
+Import data and drop missing rainfall rows.
+
+```{r}
+rainRaw <- fread("airport_data/IDCJAC0009_009021_1800_Data.csv")
+#remove nan rainfall rows, no rainfall is represented by 0, NaN is not observed/recorded in this dataset
+rain <- rainRaw %>% drop_na("Rainfall amount (millimetres)")
+rain %>% head(2)
+```
+
+Add some useful columns to our rain dataframe:
+```{r}
+#boolean for whether it rained at all
+rain <- rain %>% 
+	mutate(did_rain = `Rainfall amount (millimetres)` > 0)
+```
+
+## Should you plan to go outside? Percent chance of any rain for Perth Airport
+
+Probably the most striking feature of rain in Perth is just how seasonal it is. Looking at our first graph below we can see any given day in January has less than 10% chance of any rain while a given day in July has over 50% chance of any rain! The month to month change is dramatic, with the change in rainfall chance shifting rapidly in autumn and spring.
+
+While summers are incredibly hot, and the UV index is dangerous, summer is a great time to plan outdoor activities that would be otherwise ruined by rain. In contrast, expect the opposite in winter.
+
+```{r}
+rainy_days <- rain %>% 
+	group_by(Month, Day) %>% 
+	summarise(number_of_rainy_days = sum(did_rain), days_observed = n()) %>% 
+	mutate(proportion_rained = number_of_rainy_days/days_observed)
+
+rainy_days$index <- 1:length(rainy_days$Day)
+rainy_days <- rainy_days %>% mutate(date_str = str_c(Day, Month, sep = "/"))
+custom_breaks = c(
+	1,32,32+29,32+29+31,92+30,153,153+30,214,245,275,306,336,366
+)
+rainy_days %>% 
+	ggplot(aes(index, proportion_rained*100)) +
+	geom_point() +
+	geom_smooth(span=0.5) +
+	scale_y_continuous(breaks = seq(0,1,0.1)*100) +
+	ylab("Percentage of days with any rain") +
+	xlab("Date") +
+	scale_x_continuous(breaks = custom_breaks, labels = rainy_days$date_str[custom_breaks]) +
+	ggtitle("Should you plan to go outside? Percent chance of any rain for Perth Airport") +
+	theme_bw()
+```
+
+## Changing rainfall with climate change
+
+Perth is experiencing huge changes to it's rainfall. We can this in our next plot that shows the total rainfall each year.
+
+```{r}
+rainfall_totals_yearly <- rain %>% 
+  group_by(Year) %>% summarise(total.Yearly.Rainfall = sum(`Rainfall amount (millimetres)`)) 
+
+rainfall_totals_yearly %>% 
+  ggplot(aes(Year, total.Yearly.Rainfall)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  scale_x_continuous(breaks = c(1945,1960,1980,2000,2020)) +
+  ggtitle("Total yearly rainfall for Perth Airport (1945 to 2022)") +
+  theme_classic()
+```
+
+To get some specific numbers on this, we can run a linear regression and consider the intercept and slope.
+
+We can see that in 1945, the average rainfall is 878mm (i.e. the intercept value) and that rainfall decreases at a rate of 3.25mm a year. In 2020 we would expect the rainfall to be 634mm (the actual total was 636mm). That is a decrease of 240mm in just 75 years. 
+
+```{r}
+#to use our intercept we set 1944 to be "year zero"
+rainfall_totals_yearly <- rainfall_totals_yearly %>% mutate(Year_zeroed = Year-1944)
+rainfall_model_lm <- lm("total.Yearly.Rainfall ~ Year_zeroed" , data = rainfall_totals_yearly)
+summary(rainfall_model_lm)
+predict(rainfall_model_lm, list(Year_zeroed=2020-1945))
+```
+
+Running a second model, we can estimate that Perth would cease to have any rainfall in 89 years. Of course, it is doubtfull that the trend will continue towards zero forever as climate is rarely so simple!
+
+```{r}
+rainfalls_end_model = lm("Year_zeroed ~ total.Yearly.Rainfall" , data = rainfall_totals_yearly)
+summary(rainfalls_end_model)
+```
+
+```{r}
+878-638
+```
+
