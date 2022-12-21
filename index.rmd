@@ -1,17 +1,20 @@
 
 ---
-title: "Perth Airport Rainfall Analysis 🛫"
+title: "Perth Airport Rainfall Analysis \U0001F6EB"
 output:
   html_document:
-    toc: true
-    toc_depth: 2
-    toc_float: 
-      collapsed: false
+    toc: yes
+    toc_depth: '2'
+    toc_float:
+      collapsed: no
     theme: darkly
     highlight: tango
-    df_print: kable
+    df_print: paged
     code_folding: hide
 ---
+```{r setup, include=FALSE} 
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+```
 
 # Rainfall analysis and prediction for Perth Airport
 
@@ -81,7 +84,7 @@ rainy_days %>%
 	  breaks = custom_breaks, labels = rainy_days$date_str[custom_breaks]
 	) +
 	ggtitle("Should you plan to go outside? Percent chance of any rain for Perth Airport") +
-	theme_bw()
+	theme_classic()
 ```
 
 ## Changing rainfall with climate change
@@ -107,18 +110,44 @@ We can see that in 1945, the average rainfall is 878mm (i.e. the intercept value
 
 ```{r}
 #to use our intercept we set 1944 to be "year zero"
-rainfall_totals_yearly <- rainfall_totals_yearly %>% mutate(Year_zeroed = Year-1944)
+base_year = 1944
+rainfall_totals_yearly <- rainfall_totals_yearly %>% mutate(Year_zeroed = Year-base_year)
 rainfall_model_lm <- lm("total.Yearly.Rainfall ~ Year_zeroed" , data = rainfall_totals_yearly)
-summary(rainfall_model_lm)
-predict(rainfall_model_lm, list(Year_zeroed=2020-1945))
+broom::tidy(summary(rainfall_model_lm))
 ```
 
-Running a second model, we can estimate that Perth would cease to have any rainfall in 89 years. Of course, it is doubtful that the trend will continue towards zero forever as climate is rarely so simple!
+Here is a table showing some predicted rainfall values compared to actuals, and then extended into the future.
+
+```{r}
+Years = c(1950, 1970, 2020, 2040, 2080, 2100)
+df <- broom::tidy(predict(
+  rainfall_model_lm, list(
+    Year_zeroed=Years-base_year
+  )
+))
+df$Year <- Years
+df$Predicted_Rainfall <- df$x
+df <- merge(df, rainfall_totals_yearly %>% 
+  filter(Year %in% Years) %>% select(Year, total.Yearly.Rainfall) %>%
+    rename(Actual_rainfall = total.Yearly.Rainfall),
+  all.x = TRUE)
+df %>% 
+  select(Year, Predicted_Rainfall, Actual_rainfall) %>% 
+  mutate(Difference = Actual_rainfall - Predicted_Rainfall)
+```
+
+Running a second model, we can estimate that Perth would cease to have any rainfall in 90 years. Of course, it is doubtful that the trend will continue towards zero forever as climate is rarely so simple!
 
 ```{r}
 rainfalls_end_model = lm("Year_zeroed ~ total.Yearly.Rainfall" , data = rainfall_totals_yearly)
-summary(rainfalls_end_model)
+broom::tidy(summary(rainfalls_end_model))
 ```
+
+```{r}
+predict(rainfalls_end_model, list(total.Yearly.Rainfall = 0))
+predict(rainfall_model_lm, list(Year_zeroed = 89))
+```
+
 
 ## Changing rainfall, a deeper dive
 
