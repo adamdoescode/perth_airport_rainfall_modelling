@@ -109,9 +109,6 @@ rainfall_totals_july_august_higher <- rainfall_totals %>%
 		higher_rain == "August" ~ 1
 	)) %>% 
 	mutate(delta = `8` - `7`)
-rainfall_totals_july_august_higher %>% 
-	ggplot(aes(Year, higher_rain_ordinal)) +
-	geom_point()
 
 rainfall_totals_july_august_higher %>% 
 	ggplot(aes(Year, delta)) +

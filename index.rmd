@@ -33,6 +33,8 @@ suppressMessages(library(data.table))
 suppressMessages(library(tidyverse))
 suppressMessages(library(splines))
 suppressMessages(library(ggdark))
+suppressMessages(library(patchwork))
+require(gridExtra)
 ```
 
 ## import and clean data
@@ -90,10 +92,11 @@ rainy_days %>%
 
 ## Changing rainfall with climate change
 
-Perth is experiencing huge changes to it's rainfall. We can this in our next plot that shows the total rainfall each year.
+Perth is experiencing huge changes to it's rainfall. We can illustrate this in our next plot that shows the total rainfall each year. As we can there is steady trend of decreasing rainfall year-on-year.
 
 ```{r}
 rainfall_totals_yearly <- rain %>% 
+  filter(Year != 2022) %>% 
   group_by(Year) %>% summarise(total.Yearly.Rainfall = sum(`Rainfall amount (millimetres)`)) 
 
 rainfall_totals_yearly %>% 
@@ -105,9 +108,7 @@ rainfall_totals_yearly %>%
   dark_theme_classic()
 ```
 
-To get some specific numbers on this, we can run a linear regression and consider the intercept and slope.
-
-We can see that in 1945, the average rainfall is 878mm (i.e. the intercept value) and that rainfall decreases at a rate of 3.25mm a year. In 2020 we would expect the rainfall to be 634mm (the actual total was 636mm). That is a decrease of 240mm in just 75 years. 
+To get some specific numbers on this, we can run a linear regression and consider the intercept and slope. This will produce the same result as the line through the graph above, as `ggplot::geom_smooth(method="lm")` is using the same function as below (`lm()`).
 
 ```{r}
 #to use our intercept we set 1944 to be "year zero"
@@ -117,10 +118,12 @@ rainfall_model_lm <- lm("total.Yearly.Rainfall ~ Year_zeroed" , data = rainfall_
 broom::tidy(summary(rainfall_model_lm))
 ```
 
-Here is a table showing some predicted rainfall values compared to actuals, and then extended into the future.
+We can see that in 1944, the average rainfall is 866mm (i.e. the intercept value) and that rainfall decreases at a rate of 2.8mm a year. In 2020 we would expect the rainfall to be `r round(predict(rainfall_model_lm, list(Year_zeroed = 2020-base_year)),2)` mm (the actual total was 636mm). That is a decrease of `r round(predict(rainfall_model_lm, list(Year_zeroed = 1945-base_year)),2)-round(predict(rainfall_model_lm, list(Year_zeroed = 2020-base_year)),2)`mm in just 75 years.
+
+Here is a table showing some predicted rainfall values compared to actual totals, and then extended into the future. We can see if trends continued then our model predicts that rainfall would dwindle to zero. Of course, we can't expect trends to continue, and extending a relationship outside the measured boundaries is always 
 
 ```{r}
-Years = c(1950, 1970, 2020, 2040, 2080, 2100)
+Years = c(1950, 1970, 2020, 2040, 2080, 2100, 2200)
 df <- broom::tidy(predict(
   rainfall_model_lm, list(
     Year_zeroed=Years-base_year
@@ -137,17 +140,6 @@ df %>%
   mutate(Difference = Actual_rainfall - Predicted_Rainfall)
 ```
 
-Running a second model, we can estimate that Perth would cease to have any rainfall in 90 years. Of course, it is doubtful that the trend will continue towards zero forever as climate is rarely so simple!
-
-```{r}
-rainfalls_end_model = lm("Year_zeroed ~ total.Yearly.Rainfall" , data = rainfall_totals_yearly)
-broom::tidy(summary(rainfalls_end_model))
-```
-
-```{r}
-predict(rainfalls_end_model, list(total.Yearly.Rainfall = 0))
-predict(rainfall_model_lm, list(Year_zeroed = 89))
-```
 
 
 ## Changing rainfall, a deeper dive
@@ -158,11 +150,161 @@ This dataset is large enough for us to consider a deeper dive into Perth's chang
 
 ## in which months is rainfall increasing or decreasing?
 
+It is interesting to consider whether rainfall patterns are changing in the same way for all months and times of year. We can use linear models to approach this in two different ways:
 
+1. We can run linear models of `Year = total_rainfall` separately for each month
+2. We can use a single linear model with month as an interaction term, i.e `Year = total_rainfall * month`
 
+### linear models for each month
 
+While the latter is more elegant, the former is easier to illustrate on a graph. We can see the results on the graph below ("Perth rainfall monthly totals"). Here, we can see that the relationship between Total Rainfall and Year differs across the year. We can also plot in on the winter and summer months to get a better feel for this.
+
+We can see that rainfall totals are decreasing in winter, but appear to be steady or possibly increasing in summer (although we can't be certain of this as the p-values for the coefficients are not even nominally significance).
+
+```{r, fig.align="center", fig.width=10, fig.height=15}
+min_year = rain$Year %>% min
+max_year = rain$Year %>% max
+rainfall_totals <- rain %>% 
+	group_by(Year, Month) %>% 
+	summarise(total_rainfall = sum(`Rainfall amount (millimetres)`))
+
+allmonths <- rainfall_totals %>% 
+	filter(Year != 1944, Year != 2022) %>% 
+	ggplot(aes(Year, total_rainfall)) + 
+	facet_grid(cols=vars(Month)) +
+	geom_point(alpha = 0.5) +
+	geom_smooth(method="lm", colour = "red") +
+	scale_x_continuous(breaks = c(min_year+1, max_year-1)) +
+	ggtitle("Perth rainfall monthly totals for each month between 1945 and 2021") +
+  dark_theme_classic() +
+	theme(axis.text.x=element_text(angle=60,hjust=1))
+winter <- rainfall_totals %>% 
+	filter(Year != 1944, Year != 2022, Month %in% 6:8) %>% 
+	ggplot(aes(Year, total_rainfall)) + 
+	facet_grid(cols=vars(Month)) +
+	geom_point(alpha = 0.5) +
+	geom_smooth(method="lm", colour = "red") +
+	scale_x_continuous(breaks = c(min_year+1, max_year-1)) +
+	ggtitle("Winter Months") +
+  dark_theme_classic() +
+	theme(axis.text.x=element_text(angle=60,hjust=1))
+summer <- rainfall_totals %>% 
+	filter(Year != 1944, Year != 2022, Month %in% c(1:2,12)) %>% 
+	ggplot(aes(Year, total_rainfall)) + 
+	facet_grid(cols=vars(Month)) +
+	geom_point(alpha = 0.5) +
+	geom_smooth(method="lm", colour = "red") +
+	scale_x_continuous(breaks = c(min_year+1, max_year-1)) +
+	ggtitle("Summer months") +
+  dark_theme_classic() +
+	theme(axis.text.x=element_text(angle=60,hjust=1))
+allmonths/(winter | summer)
+```
+
+We can inspect the validity of this observation by looking at the coefficients and p-values for the `Year ~ Rainfall` relationship for each month. The table and plot below show the coefficients, standard error estimates, and p-values for each month's model. While the p-values, for the coefficient, for almost all months were nominally significant (indicating that the relationship was not zero, i.e no change) only June was significant after correcting for multiple testing.
+
+Interestingly, the *rate of change*, as expressed by the absolute magnitude of the coefficient differs considerably between months. The winter months had by far the largest rates of change. Since the winter months have negative coefficients, we interpret this as saying that rainfall is decreasing in these months much faster than in the warmer months.
+
+We can also see the summer months have very little estimated change in their year to year rainfall totals. But there are tentative, although non-significant, indications of increasing rainfall.
+
+```{r}
+models.year_vs_rainfall_per_month <- rainfall_totals %>% 
+	mutate(Year = Year - base_year) %>% 
+	group_by(Month) %>% 
+	group_modify(~ broom::tidy(lm(total_rainfall ~ Year, data = .)))
+models.year_vs_rainfall_per_month %>% 
+  mutate(nominal_significant = p.value < 0.05) %>% 
+  mutate(passes_bonferroni = p.value < 0.05/12)
+models.year_vs_rainfall_per_month %>% 
+	filter(term == "Year") %>% 
+	ggplot(aes(Month, estimate, ymin=estimate-std.error, ymax=estimate+std.error, colour = -log10(p.value))) + 
+	dark_theme_classic() +
+	geom_point() +
+	geom_pointrange() +
+  geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	ggtitle("Estimated change in average total monthly rainfall per year") +
+	ylab("estimated change rainfall (mm)") +
+	scale_x_continuous(breaks = 1:12)
+```
+
+### month as an interaction term
+
+We can also briefly pause to see how using Month as an interaction term can robustly support the hypothesis that the year-on-year change in rainfall total is influenced by the month.
+
+In order for this to work effectively we need to modify our Month variable so that it is either a `factor` or so that the winter months are the lowest or highest valued months.
+
+While using month as a factor avoids any assumptions about months being in a specific order, it also dilutes our test by requiring each Month to act as it's own variable.
+
+Instead, we can reparameterise our Month variable so that summer months have larger absolute values and winter months have smaller absolute values. We do this by subtracting the Month integer by 6 and taking the absolute value of this, leaving us with 7 unique values from 0 and 6.
+
+```{r}
+rainfall_totals <- rainfall_totals %>% 
+  mutate(Year_zeroed = Year - base_year) %>% 
+  mutate(Month_reparam = abs(Month-6))
+year.by.month.model <- lm(total_rainfall ~ Year_zeroed*Month_reparam, data=rainfall_totals)
+broom::tidy(summary(year.by.month.model))
+#values for text explanation
+#
+```
+
+We can now run our model using rainfall totals for each month, year pair. The result shows approximately what we would expect; rainfall is estimated to be decreasing year-on-year while there is a very strong negative relationship between our reparamterised Month variable (i.e rainfall decreases with increasing values, which fits with summer (larger values) having very low rainfall). We can also see that our interaction term indicates a small, but statistically significant, interaction between Year and Month. The coefficient is positive, which supports the argument that rainfall is decreasing in winter while the relationship is weaker in the warmer months.
 
 ## is the time of peak rainfall each year changing or constant?
 
+```{r}
+rainfall_totals_june_july_higher <- rainfall_totals %>% 
+	filter(Month > 5, Month < 8) %>% 
+	#cols become Year june july
+	select(Year, Month, total_rainfall) %>% 
+	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
+	mutate(higher_rain = case_when(
+		`6` > `7` ~ "June",
+		`7` > `6` ~ "July",
+	)) %>% 
+	mutate(higher_rain_ordinal = case_when(
+		higher_rain == "June" ~ 0,
+		higher_rain == "July" ~ 1
+	)) %>% 
+	mutate(delta = `7` - `6`)
+rainfall_totals_june_july_higher %>% 
+	ggplot(aes(Year, delta)) +
+	geom_point() +
+	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	geom_smooth(method="glm") +
+	ggtitle("Difference in total rainfall in July compared to June (Perth Airport, BOM data)") +
+	ylab("Difference (mm)") +
+	dark_theme_bw() +
+	ylim(-400,400) +
+	annotate("text", label = "July", x = 1980, y = 300, size = 8) +
+	annotate("text", label = "June", x = 1980, y = -300, size = 8)
+```
 
+```{r}
+rainfall_totals_july_august_higher <- rainfall_totals %>% 
+	filter(Month == 7 | Month == 8) %>% 
+	#cols become Year june july
+	select(Year, Month, total_rainfall) %>% 
+	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
+	mutate(higher_rain = case_when(
+		`7` > `8` ~ "July",
+		`8` > `7` ~ "August"
+	)) %>% 
+	mutate(higher_rain_ordinal = case_when(
+		higher_rain == "July" ~ 0,
+		higher_rain == "August" ~ 1
+	)) %>% 
+	mutate(delta = `8` - `7`)
+
+rainfall_totals_july_august_higher %>% 
+	ggplot(aes(Year, delta)) +
+	geom_point() +
+	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	geom_smooth(method="glm") +
+	ggtitle("Difference in total rainfall in August compared to July (Perth Airport, BOM data)") +
+	ylab("Difference (mm)") +
+	dark_theme_bw() +
+	ylim(-400,400) +
+	annotate("text", label = "August", x = 1980, y = 300, size = 8) +
+	annotate("text", label = "July", x = 1980, y = -300, size = 8)
+```
 
