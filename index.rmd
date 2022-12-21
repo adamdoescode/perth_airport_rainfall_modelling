@@ -251,7 +251,37 @@ We can now run our model using rainfall totals for each month, year pair. The re
 
 ## is the time of peak rainfall each year changing or constant?
 
+Another apparent trend in Perth's weather pattern is that the period of peak rainfall is shifting to later in the year. Traditionally, June has been the month with the highest rainfall totals. But as we have seen above, June is experiencing a faster decline in rainfall with each year compared to any other month. This might lead us to think that another winter month might end up with greater rainfall in future years.
+
+To test this in a visual way, we can compare 
+
 ```{r}
+rainfall_totals_may_june_higher <- rainfall_totals %>% 
+	filter(Month == 5 | Month == 6) %>% 
+	#cols become Year june july
+	select(Year, Month, total_rainfall) %>% 
+	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
+	mutate(higher_rain = case_when(
+		`5` > `6` ~ "June",
+		`6` > `5` ~ "July",
+	)) %>% 
+	mutate(higher_rain_ordinal = case_when(
+		higher_rain == "May" ~ 0,
+		higher_rain == "June" ~ 1
+	)) %>% 
+	mutate(delta = `6` - `5`)
+rainfall_totals_may_june_higher %>% 
+	ggplot(aes(Year, delta)) +
+	geom_point() +
+	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	geom_smooth(method="glm") +
+	ggtitle("Difference in total rainfall in June compared to May\n(Perth Airport, BOM data)") +
+	ylab("Difference (mm)") +
+	dark_theme_bw() +
+	ylim(-400,400) +
+	annotate("text", label = "June", x = 1980, y = 300, size = 8) +
+	annotate("text", label = "May", x = 1980, y = -300, size = 8)
+
 rainfall_totals_june_july_higher <- rainfall_totals %>% 
 	filter(Month > 5, Month < 8) %>% 
 	#cols become Year june july
@@ -271,15 +301,13 @@ rainfall_totals_june_july_higher %>%
 	geom_point() +
 	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
 	geom_smooth(method="glm") +
-	ggtitle("Difference in total rainfall in July compared to June (Perth Airport, BOM data)") +
+	ggtitle("Difference in total rainfall in July compared to June\n(Perth Airport, BOM data)") +
 	ylab("Difference (mm)") +
 	dark_theme_bw() +
 	ylim(-400,400) +
 	annotate("text", label = "July", x = 1980, y = 300, size = 8) +
 	annotate("text", label = "June", x = 1980, y = -300, size = 8)
-```
 
-```{r}
 rainfall_totals_july_august_higher <- rainfall_totals %>% 
 	filter(Month == 7 | Month == 8) %>% 
 	#cols become Year june july
@@ -300,11 +328,13 @@ rainfall_totals_july_august_higher %>%
 	geom_point() +
 	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
 	geom_smooth(method="glm") +
-	ggtitle("Difference in total rainfall in August compared to July (Perth Airport, BOM data)") +
+	ggtitle("Difference in total rainfall in August compared to July\n(Perth Airport, BOM data)") +
 	ylab("Difference (mm)") +
 	dark_theme_bw() +
 	ylim(-400,400) +
 	annotate("text", label = "August", x = 1980, y = 300, size = 8) +
 	annotate("text", label = "July", x = 1980, y = -300, size = 8)
 ```
+
+
 
