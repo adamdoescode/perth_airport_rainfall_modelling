@@ -32,6 +32,7 @@ Libraries:
 suppressMessages(library(data.table))
 suppressMessages(library(tidyverse))
 suppressMessages(library(splines))
+suppressMessages(library(ggdark))
 ```
 
 ## import and clean data
@@ -84,7 +85,7 @@ rainy_days %>%
 	  breaks = custom_breaks, labels = rainy_days$date_str[custom_breaks]
 	) +
 	ggtitle("Should you plan to go outside? Percent chance of any rain for Perth Airport") +
-	theme_classic()
+	dark_theme_classic()
 ```
 
 ## Changing rainfall with climate change
@@ -101,7 +102,7 @@ rainfall_totals_yearly %>%
   geom_smooth(method="lm") +
   scale_x_continuous(breaks = c(1945,1960,1980,2000,2020)) +
   ggtitle("Total yearly rainfall for Perth Airport (1945 to 2022)") +
-  theme_classic()
+  dark_theme_classic()
 ```
 
 To get some specific numbers on this, we can run a linear regression and consider the intercept and slope.
