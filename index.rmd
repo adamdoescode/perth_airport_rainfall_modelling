@@ -18,7 +18,7 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 # Rainfall analysis and prediction for Perth Airport
 
-Having recently moved to Perth from Newcaslte I am intrigued by the different weather patterns here in Perth. The most striking feature is that rainfall in Perth is *seasonal* while in Newcastle it is mostly constant year round.
+Having recently moved to Perth from Newcastle I am intrigued by the different weather patterns here in Perth. The most striking feature is that rainfall in Perth is *seasonal* while in Newcastle it is mostly constant year round.
 
 So I wanted to explore the nature of rainfall in Perth. Fortunately, it is easy to get data for any Australian weather site from the [Bureau of Meterology website](http://www.bom.gov.au/climate/data/?ref=ftr).
 
@@ -103,7 +103,12 @@ rainfall_totals_yearly %>%
   ggplot(aes(Year, total.Yearly.Rainfall)) +
   geom_point() +
   geom_smooth(method="lm") +
-  scale_x_continuous(breaks = c(1945,1960,1980,2000,2020)) +
+  #use expand in scale param to remove annoying scale padding
+  scale_x_continuous(breaks = c(1945,1960,1980,2000,2020), expand = c(0.01,0.01)) +
+  scale_y_continuous(
+    expand = c(0.01,0.01), 
+    limits = c(0,max(rainfall_totals_yearly$total.Yearly.Rainfall))
+  ) +
   ggtitle("Total yearly rainfall for Perth Airport (1945 to 2022)") +
   dark_theme_classic()
 ```
