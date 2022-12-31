@@ -1,6 +1,50 @@
 #test
 
 ```{r}
-print('hi')
+suppressMessages(library(data.table))
+suppressMessages(library(tidyverse))
+```
+
+Import NOAA data
+
+Download from here: https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:ASN00009021/detail
+
+Relevant column specs from documentation: https://www.ncei.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf
+
+STATION (17 characters) is the station identification code. Please see http://www1.ncdc.noaa.gov/pub/data/ghcn/daily/ghcnd-stations.txt
+STATION_NAME (max 50 characters) is the name of the station (usually city/airport name). Optional output field.
+GEOGRAPHIC_LOCATION (31 characters) is the latitude (decimated degrees w/northern hemisphere
+    values > 0, southern hemisphere values < 0), longitude (decimated degrees w/western hemisphere
+    values < 0, eastern hemisphere values > 0) and elevation above mean sea level (tenths of meters). This is
+    an optional output field.
+DATE is the year of the record (4 digits) followed by month (2 digits) and day (2 digits).
+PRCP = Precipitation (mm or inches as per user preference, inches to hundredths on Daily Form pdf file)
+SNOW = Snowfall (mm or inches as per user preference, inches to tenths on Daily Form pdf file)
+SNWD = Snow depth (mm or inches as per user preference, inches on Daily Form pdf file)
+TMAX = Maximum temperature (Fahrenheit or Celsius as per user preference, Fahrenheit to tenths on Daily Form pdf file
+TMIN = Minimum temperature (Fahrenheit or Celsius as per user preference, Fahrenheit to tenths on Daily Form pdf file
+
+```{r}
+NOAA_data <- fread("airport_data/3184544.csv")
+#filter for usability
+#turns out the data attributes are useless lol
+NOAA_data <- NOAA_data %>% select(!ends_with("_ATTRIBUTES"))
+```
+
+```{r}
+NOAA_data %>% summary
+```
+
+Snow depth data?!
+
+Looks implausible as the min temp was 12C. Rainfall total seems reasonable though. Also a bit alarmed by TMIN > TAVG which should not be true under any circumstance?
+```{r}
+NOAA_data %>% 
+  filter(!is.na(SNWD)) %>% 
+  select(!ends_with("_ATTRIBUTES"))
+```
+Or did it snow the night before? No.
+```{r}
+NOAA_data %>% filter(DATE == as.Date("1999-09-26"))
 ```
 

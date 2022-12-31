@@ -20,9 +20,20 @@ knitr::opts_chunk$set(warning = FALSE, message = FALSE)
 
 Having recently moved to Perth from Newcastle I am intrigued by the different weather patterns here in Perth. The most striking feature is that rainfall in Perth is *seasonal* while in Newcastle it is mostly constant year round.
 
-So I wanted to explore the nature of rainfall in Perth. Fortunately, it is easy to get data for any Australian weather site from the [Bureau of Meterology website](http://www.bom.gov.au/climate/data/?ref=ftr).
+So I wanted to explore the nature of rainfall in Perth. Fortunately, it is easy to get data for any Australian weather site from the [Bureau of Meterology website](http://www.bom.gov.au/climate/data/?ref=ftr). Unfortunately, this no longer works for some reason (the element you click to download data still has a download tag, but instead of data, it returns a zipped 403 page). Instead, I have used the GHCN data for Perth Airport (which comes from the BOM anyway) which you can access [here](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:ASN00009021/detail).
 
-The data I am using in this notebook is the daily rainfall totals for Perth Airport weather station. It has been continuously monitoring rainfall since May 1944! This allows us to get a good grasp on the seasonal rainfall patterns in Perth and also what the year to year trend looks like.
+Documentation for the column names can be found [here](https://www.ncei.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf). In brief they are:
+- STATION (17 characters) is the station identification code.
+- STATION_NAME (max 50 characters) is the name of the station
+- GEOGRAPHIC_LOCATION (31 characters) is the latitude, longitude, and elevation above mean sea level
+DATE is the year of the record (4 digits) followed by month (2 digits) and day (2 digits).
+PRCP = Precipitation (mm)
+SNOW = Snowfall (mm)
+SNWD = Snow depth (mm)
+TMAX = Maximum temperature (Celsius)
+TMIN = Minimum temperature (Celsius)
+
+The data I am using in this notebook is the daily rainfall totals and temperature for Perth Airport weather station. It has been continuously monitoring rainfall since May 1944! This allows us to get a good grasp on the seasonal rainfall patterns in Perth and also what the year to year trend looks like.
 
 ## code setup
 
@@ -39,21 +50,23 @@ require(gridExtra)
 
 ## import and clean data
 
-Import data and drop missing rainfall rows.
+Import data and add some useful columns to our rain dataframe. This includes a boolean for whether it rained. Really just allows me to have more comprehensible code and saves me adding an extra label to my ggplots.
 
 ```{r}
-rainRaw <- fread("airport_data/IDCJAC0009_009021_1800_Data.csv")
-#remove nan rainfall rows, no rainfall is represented by 0,
-# NaN is not observed/recorded in this dataset
-rain <- rainRaw %>% drop_na("Rainfall amount (millimetres)")
-rain %>% head(2)
-```
-
-Add some useful columns to our rain dataframe:
-```{r}
-#boolean for whether it rained at all
-rain <- rain %>% 
-	mutate(did_rain = `Rainfall amount (millimetres)` > 0)
+NOAA_data <- fread("airport_data/3184544.csv")
+#filter for usability
+#turns out the data attributes are useless lol
+NOAA_data <- NOAA_data %>% select(!ends_with("_ATTRIBUTES"))
+#add month and day cols for easier group-by summaries later
+NOAA_data <- NOAA_data %>% 
+  mutate(
+    Year = format(DATE, "%Y") %>% as.numeric(),
+    Month = month(DATE),
+    Day = format(DATE, "%d") %>% as.numeric(),
+    #bool for any rain
+    did_rain = PRCP > 0
+  )
+NOAA_data %>% head(2)
 ```
 
 ## Should you plan to go outside? Percent chance of any rain for Perth Airport
@@ -63,7 +76,7 @@ Probably the most striking feature of rain in Perth is just how seasonal it is. 
 While summers are incredibly hot, and the UV index is dangerous, summer is a great time to plan outdoor activities that would be otherwise ruined by rain. In contrast, expect the opposite in winter.
 
 ```{r}
-rainy_days <- rain %>% 
+rainy_days <- NOAA_data %>% 
 	group_by(Month, Day) %>% 
 	summarise(
 	  number_of_rainy_days = sum(did_rain), days_observed = n()
@@ -95,9 +108,8 @@ rainy_days %>%
 Perth is experiencing huge changes to it's rainfall. We can illustrate this in our next plot that shows the total rainfall each year. As we can there is steady trend of decreasing rainfall year-on-year.
 
 ```{r}
-rainfall_totals_yearly <- rain %>% 
-  filter(Year != 2022) %>% 
-  group_by(Year) %>% summarise(total.Yearly.Rainfall = sum(`Rainfall amount (millimetres)`)) 
+rainfall_totals_yearly <- NOAA_data %>% 
+  group_by(Year) %>% summarise(total.Yearly.Rainfall = sum(PRCP)) 
 
 rainfall_totals_yearly %>% 
   ggplot(aes(Year, total.Yearly.Rainfall)) +
@@ -167,24 +179,24 @@ While the latter is more elegant, the former is easier to illustrate on a graph.
 We can see that rainfall totals are decreasing in winter, but appear to be steady or possibly increasing in summer (although we can't be certain of this as the p-values for the coefficients are not even nominally significance).
 
 ```{r, fig.align="center", fig.width=10, fig.height=15}
-min_year = rain$Year %>% min
-max_year = rain$Year %>% max
-rainfall_totals <- rain %>% 
+min_year = NOAA_data$Year %>% min
+max_year = NOAA_data$Year %>% max
+rainfall_totals <- NOAA_data %>% 
 	group_by(Year, Month) %>% 
-	summarise(total_rainfall = sum(`Rainfall amount (millimetres)`))
+	summarise(total_rainfall = sum(PRCP))
 
 allmonths <- rainfall_totals %>% 
-	filter(Year != 1944, Year != 2022) %>% 
+	filter(Year != 1944) %>% 
 	ggplot(aes(Year, total_rainfall)) + 
 	facet_grid(cols=vars(Month)) +
 	geom_point(alpha = 0.5) +
 	geom_smooth(method="lm", colour = "red") +
 	scale_x_continuous(breaks = c(min_year+1, max_year-1)) +
-	ggtitle("Perth rainfall monthly totals for each month between 1945 and 2021") +
+	ggtitle("Perth rainfall monthly totals for each month between 1945 and 2022") +
   dark_theme_classic() +
 	theme(axis.text.x=element_text(angle=60,hjust=1))
 winter <- rainfall_totals %>% 
-	filter(Year != 1944, Year != 2022, Month %in% 6:8) %>% 
+	filter(Year != 1944, Month %in% 6:8) %>% 
 	ggplot(aes(Year, total_rainfall)) + 
 	facet_grid(cols=vars(Month)) +
 	geom_point(alpha = 0.5) +
@@ -194,7 +206,7 @@ winter <- rainfall_totals %>%
   dark_theme_classic() +
 	theme(axis.text.x=element_text(angle=60,hjust=1))
 summer <- rainfall_totals %>% 
-	filter(Year != 1944, Year != 2022, Month %in% c(1:2,12)) %>% 
+	filter(Year != 1944, Month %in% c(1:2,12)) %>% 
 	ggplot(aes(Year, total_rainfall)) + 
 	facet_grid(cols=vars(Month)) +
 	geom_point(alpha = 0.5) +
@@ -248,8 +260,6 @@ rainfall_totals <- rainfall_totals %>%
   mutate(Month_reparam = abs(Month-6))
 year.by.month.model <- lm(total_rainfall ~ Year_zeroed*Month_reparam, data=rainfall_totals)
 broom::tidy(summary(year.by.month.model))
-#values for text explanation
-#
 ```
 
 We can now run our model using rainfall totals for each month, year pair. The result shows approximately what we would expect; rainfall is estimated to be decreasing year-on-year while there is a very strong negative relationship between our reparamterised Month variable (i.e rainfall decreases with increasing values, which fits with summer (larger values) having very low rainfall). We can also see that our interaction term indicates a small, but statistically significant, interaction between Year and Month. The coefficient is positive, which supports the argument that rainfall is decreasing in winter while the relationship is weaker in the warmer months.
@@ -341,5 +351,15 @@ rainfall_totals_july_august_higher %>%
 	annotate("text", label = "July", x = 1980, y = -300, size = 8)
 ```
 
+# BONUS: Perth Airport Elevation
+
+```{r}
+NOAA_data %>% 
+  ggplot(aes(DATE, ELEVATION)) +
+  geom_point() +
+  geom_line() +
+  dark_theme_bw() +
+  ggtitle("Elevation of Perth Airport between 1944 and 2022")
+```
 
 
