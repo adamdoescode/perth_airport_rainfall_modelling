@@ -23,15 +23,15 @@ Having recently moved to Perth from Newcastle I am intrigued by the different we
 So I wanted to explore the nature of rainfall in Perth. Fortunately, it is easy to get data for any Australian weather site from the [Bureau of Meterology website](http://www.bom.gov.au/climate/data/?ref=ftr). Unfortunately, this no longer works for some reason (the element you click to download data still has a download tag, but instead of data, it returns a zipped 403 page). Instead, I have used the GHCN data for Perth Airport (which comes from the BOM anyway) which you can access [here](https://www.ncdc.noaa.gov/cdo-web/datasets/GHCND/stations/GHCND:ASN00009021/detail).
 
 Documentation for the column names can be found [here](https://www.ncei.noaa.gov/pub/data/cdo/documentation/GHCND_documentation.pdf). In brief they are:
-- STATION (17 characters) is the station identification code.
-- STATION_NAME (max 50 characters) is the name of the station
-- GEOGRAPHIC_LOCATION (31 characters) is the latitude, longitude, and elevation above mean sea level
-DATE is the year of the record (4 digits) followed by month (2 digits) and day (2 digits).
-PRCP = Precipitation (mm)
-SNOW = Snowfall (mm)
-SNWD = Snow depth (mm)
-TMAX = Maximum temperature (Celsius)
-TMIN = Minimum temperature (Celsius)
+- STATION (17 characters) is the station identification code.  
+- STATION_NAME (max 50 characters) is the name of the station.  
+- GEOGRAPHIC_LOCATION (31 characters) is the latitude, longitude, and elevation above mean sea level.  
+- DATE is the year of the record (4 digits) followed by month (2 digits) and day (2 digits).   
+- PRCP = Precipitation (mm).  
+- SNOW = Snowfall (mm).  
+- SNWD = Snow depth (mm).  
+- TMAX = Maximum temperature (Celsius).  
+- TMIN = Minimum temperature (Celsius).  
 
 The data I am using in this notebook is the daily rainfall totals and temperature for Perth Airport weather station. It has been continuously monitoring rainfall since May 1944! This allows us to get a good grasp on the seasonal rainfall patterns in Perth and also what the year to year trend looks like.
 
@@ -350,6 +350,46 @@ rainfall_totals_july_august_higher %>%
 	annotate("text", label = "August", x = 1980, y = 300, size = 8) +
 	annotate("text", label = "July", x = 1980, y = -300, size = 8)
 ```
+
+
+
+# Temperature trends at Perth Airport
+
+What about the temperature?
+
+```{r}
+NOAA_data %>% 
+  group_by(Year) %>% 
+  summarise(
+    TMAX = mean(TMAX, na.rm = T),
+    TMIN = mean(TMIN, na.rm = T),
+  ) %>% 
+  pivot_longer(cols=c(TMIN, TMAX), names_to = "statistic", values_to = "temperature") %>% 
+  ggplot(aes(Year, temperature, colour = statistic)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  dark_theme_bw() +
+  ggtitle("Yearly min and max temperatures for Perth Airport (1944-2022)")
+```
+
+
+```{r}
+NOAA_data %>% 
+  group_by(Month, Year) %>% 
+  summarise(
+    TMIN = mean(TMIN, na.rm = T),
+    TMAX = mean(TMAX, na.rm = T),
+  ) %>% 
+  filter(Month == 1) %>% 
+  ggplot(aes(Year, TMAX)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  dark_theme_bw()
+```
+
+
+
+
 
 # BONUS: Perth Airport Elevation
 
