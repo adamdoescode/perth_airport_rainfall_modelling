@@ -358,12 +358,15 @@ rainfall_totals_july_august_higher %>%
 What about the temperature?
 
 ```{r}
-NOAA_data %>% 
+temperature.yearly.avg <- NOAA_data %>% 
   group_by(Year) %>% 
   summarise(
     TMAX = mean(TMAX, na.rm = T),
     TMIN = mean(TMIN, na.rm = T),
-  ) %>% 
+    rain_total = sum(PRCP)
+  ) 
+
+temperature.yearly.avg %>% 
   pivot_longer(cols=c(TMIN, TMAX), names_to = "statistic", values_to = "temperature") %>% 
   ggplot(aes(Year, temperature, colour = statistic)) +
   geom_point() +
@@ -374,12 +377,14 @@ NOAA_data %>%
 
 
 ```{r}
-NOAA_data %>% 
+temperature.month.by.year.avg <- NOAA_data %>% 
   group_by(Month, Year) %>% 
   summarise(
     TMIN = mean(TMIN, na.rm = T),
     TMAX = mean(TMAX, na.rm = T),
-  ) %>% 
+    rain_total = sum(PRCP)
+  ) 
+temperature.month.by.year.avg %>% 
   filter(Month == 1) %>% 
   ggplot(aes(Year, TMAX)) +
   geom_point() +
@@ -389,6 +394,50 @@ NOAA_data %>%
 
 
 
+## Temperature's correlation with rainfall?
+
+Does temperature correlate with rainfall?
+
+We have to consider Year in this model as it also correlates with both variables and is plausibly causal, i.e. a confounder.
+
+We appear to get unstable estimates when including or excluding interaction... I guess because I also need to consider month?
+
+```{r}
+lm(rain_total ~ Year*TMAX, data = temperature.yearly.avg) %>%
+    summary %>% broom::tidy() %>% 
+    mutate(across(c("estimate", "std.error", "statistic", "p.value"), round, 2))
+lm(rain_total ~ Year+TMAX, data = temperature.yearly.avg) %>%
+    summary %>% broom::tidy() %>% 
+    mutate(across(c("estimate", "std.error", "statistic", "p.value"), round, 2))
+```
+
+Monthly model:
+
+The monthly model makes a lot more sense. But maybe that is partly due to increased sample size?
+
+```{r}
+lm(rain_total ~ Year*TMAX*Month, data = temperature.month.by.year.avg) %>% summary
+```
+
+I could look at a single month, say July:
+
+```{r}
+temperature.month.by.year.avg %>% 
+    filter(Month == 7) %>% 
+    lm(rain_total ~ TMAX, data =.) %>% 
+    summary
+```
+```{r}
+temperature.month.by.year.avg %>% 
+    filter(Month == 4) %>% 
+    ggplot(aes(TMAX, rain_total, colour=Year)) +
+    geom_point() +
+    geom_smooth(method="lm") +
+    dark_theme_bw()
+```
+
+
+I don't think there is an easy way to untangle the relationships between temperature, year, and rainfall. Or at least I am not seeing it here.
 
 
 # BONUS: Perth Airport Elevation
