@@ -16,7 +16,7 @@ output:
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 ```
 
-# Rainfall analysis and prediction for Perth Airport
+# Rainfall and temperature analysis and prediction for Perth Airport
 
 Having recently moved to Perth from Newcastle I am intrigued by the different weather patterns here in Perth. The most striking feature is that rainfall in Perth is *seasonal* while in Newcastle it is mostly constant year round.
 
@@ -69,6 +69,41 @@ NOAA_data <- NOAA_data %>%
   )
 NOAA_data %>% head(2)
 ```
+
+## data properties
+
+We should take a quick look at how rainfall and temperature are distributed.
+
+We can see that Precipitation is broadly exponentially distributed and that a vast majority of days have none to very little rain. A second graph shows that the pattern holds when 0 rain days are removed.
+
+```{r}
+hist(NOAA_data$PRCP, breaks = 50)
+hist(pull(filter(NOAA_data, PRCP != 0), PRCP), breaks = 50)
+```
+
+For temperature we can see that TMIN broadly follows a Normal distribution but appears to have a non standard shape and a slight skew.
+
+TMAX follows a non-standard distribution, with the tail to the left of the mode (approximately 18 Celsius) quickly decreasing in frequency compared to the right hand side.
+
+```{r}
+hist(NOAA_data$TMAX, breaks = 50)
+hist(NOAA_data$TMIN, breaks = 50)
+```
+
+Fortunately, we can see that taking mean values, such as mean yearly maximum temperature in a given month results in a more normally distributed variable. Although it is still somewhat irregular and there appears to be a few outliers.
+
+```{r}
+NOAA_data %>% 
+  group_by(Month_name, Year) %>% 
+  summarise(meanTMAX = mean(TMAX, na.rm = T)) %>% 
+  ggplot(aes(meanTMAX, after_stat(density))) +
+  geom_histogram() +
+  geom_density() +
+  facet_wrap(vars(Month_name)) +
+  dark_theme_bw() +
+  ggtitle("Histograms of mean maximum temperature per year for each month")
+```
+
 
 ## Should you plan to go outside? Percent chance of any rain for Perth Airport
 
@@ -362,18 +397,29 @@ The NOAA supplied dataset also includes daily min and max temperatures
 temperature.yearly.avg <- NOAA_data %>% 
   group_by(Year) %>% 
   summarise(
-    TMAX = mean(TMAX, na.rm = T),
-    TMIN = mean(TMIN, na.rm = T),
+    meanTMAX = mean(TMAX, na.rm = T),
+    maxTMAX = max(TMAX, na.rm = T),
+    minTMAX = min(TMAX, na.rm = T),
+    meanTMIN = mean(TMIN, na.rm = T),
+    maxTMIN = max(TMIN, na.rm = T),
+    minTMIN = min(TMIN, na.rm = T),
     rain_total = sum(PRCP)
   ) 
 
 temperature.yearly.avg %>% 
-  pivot_longer(cols=c(TMIN, TMAX), names_to = "statistic", values_to = "temperature") %>% 
+  pivot_longer(cols=c(meanTMIN, meanTMAX), names_to = "statistic", values_to = "temperature") %>% 
   ggplot(aes(Year, temperature, colour = statistic)) +
   geom_point() +
   geom_smooth(method = "lm") +
   dark_theme_bw() +
-  ggtitle("Yearly min and max temperatures for Perth Airport (1944-2022)")
+  ggtitle("Yearly mean min and max temperatures for Perth Airport (1944-2022)")
+temperature.yearly.avg %>% 
+  pivot_longer(cols=c(maxTMIN, maxTMAX), names_to = "statistic", values_to = "temperature") %>% 
+  ggplot(aes(Year, temperature, colour = statistic)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  dark_theme_bw() +
+  ggtitle("Yearly max min and max temperatures for Perth Airport (1944-2022)")
 ```
 
 Monthly avg min and max
@@ -442,6 +488,33 @@ graph.of.betas.temperature <- models.temperature.month.by.year.avg %>%
 monthly.temp.trend.graph / graph.of.betas.temperature
 ```
 
+```{r}
+temperature.month.by.year.avg %>% 
+  mutate(temp_range = TMAX-TMIN) %>% 
+  filter(Month > 9) %>% 
+  ggplot(aes(Year, temp_range)) +
+  geom_point(alpha=0.2) +
+  geom_smooth(method="lm") +
+  facet_grid(cols = vars(Month_name)) +
+  dark_theme_bw()
+```
+
+Yearly min and max regardless of month?
+
+```{r}
+temperature.yearly.avg 
+```
+
+
+A quick look at aggregated Monthly 
+
+```{r}
+temperature.month.by.year.avg %>% 
+  mutate(temp_range = TMAX-TMIN) %>% 
+  group_by(Year) %>% summarise(mean_temp_range = mean(temp_range, na.rm = T)) %>% 
+  ggplot(aes(Year, mean_temp_range)) + geom_point() + dark_theme_bw() +geom_smooth() +
+  ggtitle("Mean yearly temperature range for Perth Airport (1944-2022)")
+```
 
 
 ```{r}
