@@ -64,7 +64,8 @@ NOAA_data <- NOAA_data %>%
     Month = month(DATE),
     Day = format(DATE, "%d") %>% as.numeric(),
     #bool for any rain
-    did_rain = PRCP > 0
+    did_rain = PRCP > 0,
+    Month_name = month.name[Month] %>% fct_relevel(month.name)
   )
 NOAA_data %>% head(2)
 ```
@@ -355,7 +356,7 @@ rainfall_totals_july_august_higher %>%
 
 # Temperature trends at Perth Airport
 
-What about the temperature?
+The NOAA supplied dataset also includes daily min and max temperatures 
 
 ```{r}
 temperature.yearly.avg <- NOAA_data %>% 
@@ -375,15 +376,75 @@ temperature.yearly.avg %>%
   ggtitle("Yearly min and max temperatures for Perth Airport (1944-2022)")
 ```
 
-
+Monthly avg min and max
 ```{r}
 temperature.month.by.year.avg <- NOAA_data %>% 
-  group_by(Month, Year) %>% 
+  group_by(Month, Month_name, Year) %>% 
   summarise(
     TMIN = mean(TMIN, na.rm = T),
     TMAX = mean(TMAX, na.rm = T),
     rain_total = sum(PRCP)
   ) 
+
+temperature.month.by.year.avg %>% 
+  filter(Year == 1945) %>% 
+  ggplot(aes(x=Month, ymin=TMIN, ymax=TMAX)) +
+  geom_linerange() +
+  dark_theme_bw()
+temperature.month.by.year.avg %>% 
+  filter(Month == 1) %>% 
+  ggplot(aes(x=Year, ymin=TMIN, ymax=TMAX)) +
+  geom_linerange() +
+  dark_theme_bw()
+temperature.month.by.year.avg %>% 
+  filter(Month == 7) %>% 
+  ggplot(aes(x=Year, ymin=TMIN, ymax=TMAX)) +
+  geom_linerange() +
+  dark_theme_bw()
+```
+
+Does the difference between min and max stay the same? No, but the change we see is fairly small. It is maybe more interesting to note that it depends what month you are talking about.
+
+```{r, fig.align="center", fig.width=10, fig.height=10}
+#here we generate two plots and then present them together using patchwork
+
+monthly.temp.trend.graph <- temperature.month.by.year.avg %>% 
+  mutate(temp_range = TMAX-TMIN) %>% 
+  #adjust the month names
+  ggplot(aes(Year, temp_range)) +
+  geom_point(alpha=0.2) +
+  geom_smooth(method="lm") +
+  facet_grid(cols = vars(Month_name)) +
+  ggtitle("") +
+  scale_x_continuous(breaks=c(1945,2022)) +
+  dark_theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
+
+models.temperature.month.by.year.avg <- temperature.month.by.year.avg %>% 
+  mutate(
+    temp_range = TMAX-TMIN,
+    Year = Year - base_year
+  ) %>% 
+	group_by(Month) %>% 
+	group_modify(~ broom::tidy(lm(temp_range ~ Year, data = .))) %>% 
+  mutate(Month_name = month.name[Month] %>% fct_relevel(month.name))
+
+graph.of.betas.temperature <- models.temperature.month.by.year.avg %>% 
+  filter(term == "Year") %>% 
+  ggplot(aes(Month_name, estimate, ymin=estimate-std.error, ymax=estimate+std.error, colour = -log10(p.value))) + 
+	dark_theme_classic() +
+	geom_point() +
+	geom_pointrange() +
+  geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+  ggtitle("Estimated trend in difference between minimum and maxium temperature for each month") +
+  ylab("mean change per year in degrees celsius")
+
+monthly.temp.trend.graph / graph.of.betas.temperature
+```
+
+
+
+```{r}
 temperature.month.by.year.avg %>% 
   filter(Month == 1) %>% 
   ggplot(aes(Year, TMAX)) +
@@ -391,6 +452,16 @@ temperature.month.by.year.avg %>%
   geom_smooth(method = "lm") +
   dark_theme_bw()
 ```
+
+```{r}
+
+```
+
+
+
+
+
+
 
 
 
