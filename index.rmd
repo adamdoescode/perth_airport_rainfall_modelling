@@ -193,8 +193,6 @@ df %>%
   mutate(Difference = Actual_rainfall - Predicted_Rainfall)
 ```
 
-
-
 ## Changing rainfall, a deeper dive
 
 This dataset is large enough for us to consider a deeper dive into Perth's changing rainfall. We can explore a few questions with graphs and statistical models:
@@ -304,87 +302,60 @@ We can now run our model using rainfall totals for each month, year pair. The re
 
 Another apparent trend in Perth's weather pattern is that the period of peak rainfall is shifting to later in the year. Traditionally, June has been the month with the highest rainfall totals. But as we have seen above, June is experiencing a faster decline in rainfall with each year compared to any other month. This might lead us to think that another winter month might end up with greater rainfall in future years.
 
-To test this in a visual way, we can compare 
+To test this in a visual way, we can compare months against each other.
 
-```{r}
-rainfall_totals_may_june_higher <- rainfall_totals %>% 
-	filter(Month == 5 | Month == 6) %>% 
-	#cols become Year june july
-	select(Year, Month, total_rainfall) %>% 
+```{r, fig.align="center", fig.width=10, fig.height=10}
+rainfall_totals_bigger_month <- rainfall_totals %>% 
+  select(Year, Month, total_rainfall) %>% 
 	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
-	mutate(higher_rain = case_when(
-		`5` > `6` ~ "June",
-		`6` > `5` ~ "July",
-	)) %>% 
-	mutate(higher_rain_ordinal = case_when(
-		higher_rain == "May" ~ 0,
-		higher_rain == "June" ~ 1
-	)) %>% 
-	mutate(delta = `6` - `5`)
-rainfall_totals_may_june_higher %>% 
-	ggplot(aes(Year, delta)) +
+  mutate(
+    delta_6_5 = `6` - `5`,
+    delta_7_6 = `7` - `6`,
+    delta_8_7 = `8` - `7`,
+    delta_9_8 = `9` - `8`,
+  )
+may <- rainfall_totals_bigger_month %>% 
+  ggplot(aes(Year, delta_6_5)) + geom_point() +
+	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	geom_smooth(method="glm") +
+	ggtitle("Difference in total rainfall in\nJune compared to May") +
+	ylab("Difference (mm)") + dark_theme_bw() + ylim(-400,400) +
+	annotate("text", label = "May", x = 1980, y = 300, size = 8) +
+	annotate("text", label = "June", x = 1980, y = -300, size = 8)
+june <- rainfall_totals_bigger_month %>% 
+  ggplot(aes(Year, delta_7_6)) +
 	geom_point() +
 	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
 	geom_smooth(method="glm") +
-	ggtitle("Difference in total rainfall in June compared to May\n(Perth Airport, BOM data)") +
-	ylab("Difference (mm)") +
-	dark_theme_bw() +
-	ylim(-400,400) +
-	annotate("text", label = "June", x = 1980, y = 300, size = 8) +
-	annotate("text", label = "May", x = 1980, y = -300, size = 8)
-
-rainfall_totals_june_july_higher <- rainfall_totals %>% 
-	filter(Month > 5, Month < 8) %>% 
-	#cols become Year june july
-	select(Year, Month, total_rainfall) %>% 
-	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
-	mutate(higher_rain = case_when(
-		`6` > `7` ~ "June",
-		`7` > `6` ~ "July",
-	)) %>% 
-	mutate(higher_rain_ordinal = case_when(
-		higher_rain == "June" ~ 0,
-		higher_rain == "July" ~ 1
-	)) %>% 
-	mutate(delta = `7` - `6`)
-rainfall_totals_june_july_higher %>% 
-	ggplot(aes(Year, delta)) +
-	geom_point() +
-	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
-	geom_smooth(method="glm") +
-	ggtitle("Difference in total rainfall in July compared to June\n(Perth Airport, BOM data)") +
+	ggtitle("Difference in total rainfall in\nJuly compared to June") +
 	ylab("Difference (mm)") +
 	dark_theme_bw() +
 	ylim(-400,400) +
 	annotate("text", label = "July", x = 1980, y = 300, size = 8) +
 	annotate("text", label = "June", x = 1980, y = -300, size = 8)
-
-rainfall_totals_july_august_higher <- rainfall_totals %>% 
-	filter(Month == 7 | Month == 8) %>% 
-	#cols become Year june july
-	select(Year, Month, total_rainfall) %>% 
-	pivot_wider(names_from = c(Month), values_from = total_rainfall) %>% 
-	mutate(higher_rain = case_when(
-		`7` > `8` ~ "July",
-		`8` > `7` ~ "August"
-	)) %>% 
-	mutate(higher_rain_ordinal = case_when(
-		higher_rain == "July" ~ 0,
-		higher_rain == "August" ~ 1
-	)) %>% 
-	mutate(delta = `8` - `7`)
-
-rainfall_totals_july_august_higher %>% 
-	ggplot(aes(Year, delta)) +
+july <- rainfall_totals_bigger_month %>% 
+  ggplot(aes(Year, delta_8_7)) +
 	geom_point() +
 	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
 	geom_smooth(method="glm") +
-	ggtitle("Difference in total rainfall in August compared to July\n(Perth Airport, BOM data)") +
+	ggtitle("Difference in total rainfall in\nAugust compared to July") +
 	ylab("Difference (mm)") +
 	dark_theme_bw() +
 	ylim(-400,400) +
 	annotate("text", label = "August", x = 1980, y = 300, size = 8) +
 	annotate("text", label = "July", x = 1980, y = -300, size = 8)
+august <- rainfall_totals_bigger_month %>% 
+  ggplot(aes(Year, delta_9_8)) +
+	geom_point() +
+	geom_hline(yintercept = 0, linetype = 'dashed', alpha = 0.8, colour = "red") +
+	geom_smooth(method="glm") +
+	ggtitle("Difference in total rainfall in\nSeptember compared to August") +
+	ylab("Difference (mm)") +
+	dark_theme_bw() +
+	ylim(-400,400) +
+	annotate("text", label = "September", x = 1980, y = 300, size = 8) +
+	annotate("text", label = "August", x = 1980, y = -300, size = 8)
+(may + june) / (july + august)
 ```
 
 
@@ -403,7 +374,8 @@ temperature.yearly.avg <- NOAA_data %>%
     meanTMIN = mean(TMIN, na.rm = T),
     maxTMIN = max(TMIN, na.rm = T),
     minTMIN = min(TMIN, na.rm = T),
-    rain_total = sum(PRCP)
+    rain_total = sum(PRCP),
+    base_year = Year - base_year
   ) 
 
 temperature.yearly.avg %>% 
@@ -422,53 +394,56 @@ temperature.yearly.avg %>%
   ggtitle("Yearly max min and max temperatures for Perth Airport (1944-2022)")
 ```
 
+```{r}
+NOAA_data %>% 
+  group_by(Month, Year) %>% 
+  summarise(sum(TMIN, na.rm = T))
+```
+
+
 Monthly avg min and max
 ```{r}
 temperature.month.by.year.avg <- NOAA_data %>% 
-  group_by(Month, Month_name, Year) %>% 
+  group_by(Month, Year) %>% 
   summarise(
-    TMIN = mean(TMIN, na.rm = T),
-    TMAX = mean(TMAX, na.rm = T),
-    rain_total = sum(PRCP)
-  ) 
-
-temperature.month.by.year.avg %>% 
-  filter(Year == 1945) %>% 
-  ggplot(aes(x=Month, ymin=TMIN, ymax=TMAX)) +
-  geom_linerange() +
-  dark_theme_bw()
-temperature.month.by.year.avg %>% 
-  filter(Month == 1) %>% 
-  ggplot(aes(x=Year, ymin=TMIN, ymax=TMAX)) +
-  geom_linerange() +
-  dark_theme_bw()
-temperature.month.by.year.avg %>% 
-  filter(Month == 7) %>% 
-  ggplot(aes(x=Year, ymin=TMIN, ymax=TMAX)) +
-  geom_linerange() +
-  dark_theme_bw()
+    meanTMIN = mean(TMIN, na.rm = T),
+    meanTMAX = mean(TMAX, na.rm = T),
+    rain_total = sum(PRCP, na.rm = T),
+  ) %>% 
+  mutate(
+    base_year = Year - base_year,
+    Month_name = month.name[Month] %>% fct_relevel(month.name)
+  )
 ```
 
 Does the difference between min and max stay the same? No, but the change we see is fairly small. It is maybe more interesting to note that it depends what month you are talking about.
 
+```{r}
+models.temperature.month.by.year.avg %>% 
+  filter(term == "Year") %>% 
+  ggplot(aes(Month_name, estimate, ymin=estimate-std.error, ymax=estimate+std.error, colour = -log10(p.value))) + 
+	dark_theme_classic() +
+	geom_point() +
+geom_pointrange()
+```
+
+
 ```{r, fig.align="center", fig.width=10, fig.height=10}
 #here we generate two plots and then present them together using patchwork
-
 monthly.temp.trend.graph <- temperature.month.by.year.avg %>% 
-  mutate(temp_range = TMAX-TMIN) %>% 
-  #adjust the month names
+  mutate(temp_range = meanTMAX-meanTMIN) %>% 
   ggplot(aes(Year, temp_range)) +
   geom_point(alpha=0.2) +
+  dark_theme_bw() +
   geom_smooth(method="lm") +
   facet_grid(cols = vars(Month_name)) +
   ggtitle("") +
   scale_x_continuous(breaks=c(1945,2022)) +
-  dark_theme_bw() +
   theme(axis.text.x = element_text(angle = 90, vjust = 0.5))
 
 models.temperature.month.by.year.avg <- temperature.month.by.year.avg %>% 
   mutate(
-    temp_range = TMAX-TMIN,
+    temp_range = meanTMAX-meanTMIN,
     Year = Year - base_year
   ) %>% 
 	group_by(Month) %>% 
@@ -526,16 +501,13 @@ temperature.month.by.year.avg %>%
   dark_theme_bw()
 ```
 
+
+
 ```{r}
-
+NOAA_data %>% 
+  filter(Year == 1945) %>% 
+  summarise(sum(PRCP), mean(TMAX))
 ```
-
-
-
-
-
-
-
 
 
 ## Temperature's correlation with rainfall?
@@ -544,23 +516,48 @@ Does temperature correlate with rainfall?
 
 We have to consider Year in this model as it also correlates with both variables and is plausibly causal, i.e. a confounder.
 
-We appear to get unstable estimates when including or excluding interaction... I guess because I also need to consider month?
+The estimates can be interpreted as follows. The intercept gives us our baseline rainfall total in 1944 (over 2000mm)
 
 ```{r}
-lm(rain_total ~ Year*TMAX, data = temperature.yearly.avg) %>%
+model.rainfall.vs.year.meanTMAX.interaction <- lm(rain_total ~ base_year*meanTMAX, data = temperature.yearly.avg)
+model.rainfall.vs.year.meanTMAX.interaction %>%
     summary %>% broom::tidy() %>% 
     mutate(across(c("estimate", "std.error", "statistic", "p.value"), round, 2))
-lm(rain_total ~ Year+TMAX, data = temperature.yearly.avg) %>%
+model.rainfall.vs.year.meanTMAX <- lm(rain_total ~ base_year+meanTMAX, data = temperature.yearly.avg)
+model.rainfall.vs.year.meanTMAX %>%
     summary %>% broom::tidy() %>% 
     mutate(across(c("estimate", "std.error", "statistic", "p.value"), round, 2))
 ```
+
+```{r}
+temperature.yearly.avg %>% 
+  ggplot(aes(meanTMAX, rain_total)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  dark_theme_bw()
+temperature.yearly.avg %>% 
+  ggplot(aes(base_year, rain_total)) +
+  geom_point() +
+  geom_smooth(method="lm") +
+  dark_theme_bw()
+
+predict(
+  model.rainfall.vs.year.meanTMAX,
+  list(
+    Year = 0,
+    meanTMAX = 0
+  )
+)
+```
+
 
 Monthly model:
 
 The monthly model makes a lot more sense. But maybe that is partly due to increased sample size?
 
 ```{r}
-lm(rain_total ~ Year*TMAX*Month, data = temperature.month.by.year.avg) %>% summary
+lm(rain_total ~ Year*meanTMAX*Month, data = temperature.month.by.year.avg) %>% 
+  summary %>% broom::tidy()
 ```
 
 I could look at a single month, say July:
@@ -568,13 +565,13 @@ I could look at a single month, say July:
 ```{r}
 temperature.month.by.year.avg %>% 
     filter(Month == 7) %>% 
-    lm(rain_total ~ TMAX, data =.) %>% 
+    lm(rain_total ~ meanTMAX, data =.) %>% 
     summary
 ```
 ```{r}
 temperature.month.by.year.avg %>% 
     filter(Month == 4) %>% 
-    ggplot(aes(TMAX, rain_total, colour=Year)) +
+    ggplot(aes(meanTMAX, rain_total, colour=Year)) +
     geom_point() +
     geom_smooth(method="lm") +
     dark_theme_bw()
